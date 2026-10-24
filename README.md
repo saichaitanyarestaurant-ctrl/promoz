@@ -1,245 +1,130 @@
-# AI Orchestrator
+# Promoz AI Orchestrator
 
-A fully functional AI-powered orchestration platform that processes natural language commands using OpenRouter AI. The application runs on both PC and mobile browsers with a modern, responsive interface.
+Promoz is an early-stage Python prototype for turning natural-language requests into structured tasks and routing those tasks to configured service endpoints. It uses FastAPI, SQLAlchemy, SQLite by default, and OpenRouter for language-model responses.
 
-## 🚀 Features
+> **Project status:** Prototype, not production-ready. External services must be configured separately. The queue is in-memory, API authentication is not implemented, and pending work may not be recovered after a restart. Run it only on a trusted development machine or network; do not expose it directly to the public internet.
 
-- **Natural Language Processing**: Submit commands in plain English
-- **Real-time Task Monitoring**: Track task status and progress
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
-- **Modern UI**: Clean, intuitive interface built with TailwindCSS
-- **API Integration**: RESTful API with comprehensive endpoints
-- **Task Queue Management**: Monitor pending, processing, and completed tasks
-- **Conversation History**: Track all interactions
-- **Error Handling**: Comprehensive error reporting and logging
+## Current capabilities
 
-## 🏗️ Architecture
+- Natural-language command parsing through the OpenRouter API.
+- Structured task records, priorities, statuses, and conversation-history models.
+- FastAPI endpoints for commands, tasks, queue status, conversations, and health.
+- Priority-based in-process queue that calls configured task-service endpoints.
+- A browser-based dashboard and API documentation.
 
-- **Backend**: FastAPI with SQLAlchemy for database management
-- **Frontend**: Modern HTML/CSS/JavaScript with TailwindCSS
-- **AI Integration**: OpenRouter API for natural language processing
-- **Database**: SQLite (can be easily switched to PostgreSQL/MySQL)
-- **Task Queue**: Built-in queue management system
+A task is only as capable as the configured service that receives it. The repository should not be treated as a general-purpose autonomous agent or as a verified integration with every example service listed in the configuration.
 
-## 📁 Project Structure
+## Architecture
 
-```
-ai-orchestrator/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   │   └── routes.py          # API endpoints
-│   │   ├── core/
-│   │   │   ├── command_parser.py  # Command parsing logic
-│   │   │   └── orchestrator.py    # Main orchestration logic
-│   │   ├── models/
-│   │   │   ├── database.py        # Database models
-│   │   │   ├── task.py           # Task model
-│   │   │   ├── user.py           # User model
-│   │   │   └── conversation.py   # Conversation model
-│   │   └── services/
-│   │       └── llm_service.py    # OpenRouter integration
-│   ├── main.py                   # FastAPI application entry point
-│   └── requirements.txt          # Python dependencies
-├── frontend/
-│   └── static/
-│       ├── index.html            # Main HTML file
-│       ├── styles.css            # Custom CSS styles
-│       └── app.js               # Frontend JavaScript
-├── .env.example                  # Environment variables template
-├── README.md                     # This file
-└── setup.sh                      # Setup script
-```
+- **Backend:** Python 3.11+, FastAPI, SQLAlchemy.
+- **LLM integration:** OpenRouter Chat Completions API.
+- **Database:** SQLite by default; other SQLAlchemy-supported databases may require configuration and validation.
+- **Frontend:** Static HTML/CSS/JavaScript and a separate frontend/web application.
+- **Task execution:** In-process priority queue with HTTP requests to configured services.
 
-## 🛠️ Quick Start
+## Quick start
 
 ### Prerequisites
 
-- Python 3.11+
-- OpenRouter API key (get one at [openrouter.ai](https://openrouter.ai))
+- Python 3.11 or newer.
+- An OpenRouter API key for natural-language command parsing.
+- Git.
 
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd ai-orchestrator
-   ```
-
-2. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your OpenRouter API key
-   ```
-
-3. **Install Python dependencies**
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   ```
-
-4. **Run the application**
-   ```bash
-   uvicorn main:app --reload
-   ```
-
-5. **Access the application**
-   - **Web Interface**: http://localhost:8000
-   - **API Documentation**: http://localhost:8000/docs
-   - **Health Check**: http://localhost:8000/health
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create a `.env` file in the root directory with the following variables:
+### Install
 
 ```bash
-# Required
-OPENROUTER_API_KEY=your-openrouter-api-key-here
-OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
-
-# Optional
-HOST=0.0.0.0
-PORT=8000
-DEBUG=True
-DATABASE_URL=sqlite:///./ai_orchestrator.db
+git clone https://github.com/saichaitanyarestaurant-ctrl/promoz.git
+cd promoz
+python -m venv .venv
 ```
 
-### OpenRouter Setup
+Activate the environment:
 
-1. Visit [openrouter.ai](https://openrouter.ai)
-2. Create an account and get your API key
-3. Add the API key to your `.env` file
-4. Choose your preferred model (default: `anthropic/claude-3.5-sonnet`)
+- **Windows PowerShell:** `.venv\\Scripts\\Activate.ps1`
+- **macOS/Linux:** `source .venv/bin/activate`
 
-## 📱 Usage
-
-### Web Interface
-
-1. Open your browser and navigate to `http://localhost:8000`
-2. Enter a natural language command in the text area
-3. Click "Submit Command" or press `Ctrl+Enter`
-4. Monitor the task status in real-time
-5. View results and conversation history
-
-### Example Commands
-
-- `"Go to google.com and search for 'AI automation'"`
-- `"Create a summary of the latest AI trends"`
-- `"Send an email to john@example.com about the meeting"`
-- `"Analyze the sentiment of customer reviews"`
-
-### API Endpoints
-
-- `POST /api/v1/command` - Submit a new command
-- `GET /api/v1/task/{task_id}` - Get task status
-- `GET /api/v1/queue/status` - Get queue status
-- `GET /api/v1/tasks` - List recent tasks
-- `DELETE /api/v1/task/{task_id}` - Cancel a task
-- `GET /api/v1/health` - Health check
-
-## 🎨 Frontend Features
-
-- **Responsive Design**: Works on desktop, tablet, and mobile
-- **Real-time Updates**: Automatic polling for status updates
-- **Keyboard Shortcuts**: 
-  - `Ctrl+Enter`: Submit command
-  - `Escape`: Clear command input
-- **Toast Notifications**: Success/error feedback
-- **Loading States**: Visual feedback during processing
-- **API Log**: Real-time API interaction logging
-
-## 🔌 API Integration
-
-The application exposes a RESTful API that can be integrated with other systems:
+Install backend dependencies and create your local environment file:
 
 ```bash
-# Submit a command
-curl -X POST "http://localhost:8000/api/v1/command" \
-  -H "Content-Type: application/json" \
-  -d '{"command": "Go to google.com and search for AI", "user_id": 1}'
-
-# Get task status
-curl "http://localhost:8000/api/v1/task/1"
-
-# Get queue status
-curl "http://localhost:8000/api/v1/queue/status"
+python -m pip install --upgrade pip
+python -m pip install -r backend/requirements.txt
 ```
 
-## 🚀 Deployment
+Copy `.env.example` to `.env` in the repository root, then set `OPENROUTER_API_KEY` to your own key. Never commit a real API key.
 
-### Local Development
+Run the backend from its directory:
 
 ```bash
-# Run with auto-reload
-uvicorn backend.main:app --reload
-
-# Run in production mode
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
+cd backend
+uvicorn main:app --reload
 ```
 
-### Docker Deployment
+Local endpoints:
+
+- Dashboard (when the static frontend is available): http://localhost:8000/
+- API documentation: http://localhost:8000/docs
+- Health check: http://localhost:8000/health
+- Versioned API root: http://localhost:8000/api/v1/
+
+## Configuration
+
+The main settings are read from environment variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `OPENROUTER_API_KEY` | API key used to parse natural-language commands |
+| `OPENROUTER_MODEL` | Model ID; defaults to the value in the application |
+| `DATABASE_URL` | SQLAlchemy database URL; defaults to local SQLite |
+| `HOST` / `PORT` | Server bind address and port |
+| `CORS_ORIGINS` | Allowed frontend origins |
+
+Keep secrets in `.env` or another secrets manager; `.env.example` contains placeholders only.
+
+## Tests
+
+The unit tests use an isolated in-memory SQLite database and do not require an OpenRouter key or running service endpoints.
+
+From the repository root:
 
 ```bash
-# Build and run with Docker
-docker build -t ai-orchestrator .
-docker run -p 8000:8000 --env-file .env ai-orchestrator
+python -m pip install -r backend/requirements.txt
+python -m pytest -q backend/tests
 ```
 
-### Production Considerations
+GitHub Actions runs the offline unit tests on pushes to the maintenance branch and `main`, and on pull requests targeting `main`.
 
-- Use a production WSGI server like Gunicorn
-- Set up a reverse proxy (Nginx/Apache)
-- Configure SSL/TLS certificates
-- Use a production database (PostgreSQL/MySQL)
-- Set up proper logging and monitoring
+## API overview
 
-## 🐛 Troubleshooting
+Routes are mounted under `/api/v1`:
 
-### Common Issues
+- `POST /command` — parse and enqueue a command.
+- `GET /task/{task_id}` — retrieve a task.
+- `GET /tasks` — list tasks, optionally filtered by status.
+- `GET /queue/status` — queue counters.
+- `DELETE /task/{task_id}` — cancel a pending task.
+- `GET /services/health` — service health summary.
+- `POST /conversation` and `GET /conversation/{conversation_id}` — conversation operations.
+- `GET /health` — API health check.
 
-1. **Connection Error**
-   - Check if the server is running
-   - Verify the port is not in use
-   - Check firewall settings
+Interactive OpenAPI documentation is available at `/docs` when the backend is running.
 
-2. **OpenRouter API Errors**
-   - Verify your API key is correct
-   - Check your OpenRouter account has sufficient credits
-   - Ensure the model name is valid
+## Known limitations
 
-3. **Database Errors**
-   - Check database file permissions
-   - Verify DATABASE_URL in .env file
-   - Ensure the logs directory exists
+- Authentication, authorization, rate limiting, and tenant isolation are not implemented.
+- The queue is held in process memory and is not a durable distributed queue.
+- External service endpoints and their credentials must be configured and tested independently.
+- Production deployment, concurrency behavior, restart recovery, and security boundaries need further validation.
+- Automated tests cover core validation and queue behavior; they do not establish that every external integration works end-to-end.
 
-### Logs
+Contributions that improve tests, setup reliability, safe defaults, and the documented behavior are welcome. Please open an issue to discuss substantial changes before submitting a pull request.
 
-Check the application logs at `backend/logs/ai_orchestrator.log` for detailed error information.
+## Licence
 
-## 🤝 Contributing
+This project is licensed under the [MIT License](LICENSE).
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+## Acknowledgements
 
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- [OpenRouter](https://openrouter.ai) for AI model access
-- [FastAPI](https://fastapi.tiangolo.com) for the web framework
-- [TailwindCSS](https://tailwindcss.com) for styling
-- [SQLAlchemy](https://sqlalchemy.org) for database ORM
-
-## 📞 Support
-
-For support and questions:
-- Create an issue on GitHub
-- Check the API documentation at `/docs`
-- Review the troubleshooting section above
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [SQLAlchemy](https://www.sqlalchemy.org/)
+- [OpenRouter](https://openrouter.ai/)
+- [pytest](https://docs.pytest.org/)
