@@ -11,6 +11,7 @@ alembic
 # HTTP and Async
 httpx
 aiohttp
+playwright
 
 # Utilities
 python-dotenv

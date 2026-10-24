@@ -36,9 +36,12 @@ class TaskRouter:
             task.status = TaskStatus.PROCESSING
             self.db.commit()
 
-            # Route to service
-            service_url = self._get_service_url(task.target_service)
-            endpoint = task.service_endpoint or self._get_default_endpoint(task.target_service)
+            # Prefer the configured service URL, falling back to environment
+            # defaults. Normalize slashes to avoid requests like /service//execute.
+            service_url = (service_config.base_url or self._get_service_url(task.target_service)).rstrip("/")
+            endpoint = "/" + (task.service_endpoint or self._get_default_endpoint(task.target_service)).strip("/")
+            if not service_url:
+                raise ValueError(f"No base URL configured for service {task.target_service}")
             
             # Prepare request payload
             payload = {
@@ -51,7 +54,7 @@ class TaskRouter:
             # Make request to service
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    f"{service_url}/{endpoint}",
+                    f"{service_url}{endpoint}",
                     json=payload,
                     headers={"Content-Type": "application/json"}
                 )

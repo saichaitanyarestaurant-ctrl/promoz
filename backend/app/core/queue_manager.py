@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc
 from ..models.task import Task, TaskStatus, TaskPriority
+from .task_router import TaskRouter
 from datetime import datetime
 import heapq
 
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 class QueueManager:
     def __init__(self, db: Session):
         self.db = db
+        self.task_router = TaskRouter(db)
         self.processing_queue = asyncio.Queue()
         self.priority_queue = []
         self.max_concurrent_tasks = 5
@@ -62,19 +64,14 @@ class QueueManager:
         Get the next task from the queue based on priority.
         """
         try:
-            if not self.priority_queue:
-                return None
-                
-            # Get highest priority task
-            _, task_id, task = heapq.heappop(self.priority_queue)
-            
-            # Verify task is still pending
-            current_task = self.db.query(Task).filter(Task.id == task_id).first()
-            if not current_task or current_task.status != TaskStatus.PENDING:
-                return await self.get_next_task()  # Try next task
-                
-            return current_task
-            
+            # Discard stale/cancelled queue entries without recursive calls.
+            while self.priority_queue:
+                _, task_id, _queued_task = heapq.heappop(self.priority_queue)
+                current_task = self.db.query(Task).filter(Task.id == task_id).first()
+                if current_task and current_task.status == TaskStatus.PENDING:
+                    return current_task
+            return None
+
         except Exception as e:
             logger.error(f"Error getting next task: {e}")
             return None
@@ -111,31 +108,34 @@ class QueueManager:
         """
         try:
             logger.info(f"Processing task {task.id}: {task.title}")
-            
-            # Update task status
+
             task.status = TaskStatus.PROCESSING
             task.started_at = datetime.utcnow()
             self.db.commit()
-            
-            # Here you would call the task router to execute the task
-            # For now, we'll just simulate processing
-            await asyncio.sleep(2)  # Simulate processing time
-            
-            # Mark as completed
+
+            # Execute the task through its configured service. Do not mark a
+            # task complete merely because a simulated delay has elapsed.
+            result = await self.task_router.route_task(task)
+            if task.result is None and result is not None:
+                task.result = result
             task.status = TaskStatus.COMPLETED
             task.completed_at = datetime.utcnow()
             self.db.commit()
-            
+
             logger.info(f"Task {task.id} completed successfully")
-            
+
         except Exception as e:
-            logger.error(f"Error processing task {task.id}: {e}")
-            task.status = TaskStatus.FAILED
-            task.error_message = str(e)
-            self.db.commit()
-            
+            logger.exception("Error processing task %s", task.id)
+            self.db.rollback()
+            task = self.db.query(Task).filter(Task.id == task.id).first()
+            if task is not None:
+                task.status = TaskStatus.FAILED
+                task.error_message = str(e)
+                task.completed_at = datetime.utcnow()
+                self.db.commit()
+
         finally:
-            self.active_tasks -= 1
+            self.active_tasks = max(0, self.active_tasks - 1)
 
     def get_queue_status(self) -> Dict[str, Any]:
         """

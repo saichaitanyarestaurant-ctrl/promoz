@@ -1,5 +1,7 @@
 import os
+import json
 import logging
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
@@ -15,6 +17,10 @@ from app.models import Task, User, Conversation, ConversationMessage, ServiceCon
 # Load environment variables
 load_dotenv()
 
+# Create the log directory before configuring FileHandler. Without this,
+# importing the application from a clean checkout can fail on startup.
+os.makedirs("logs", exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -26,9 +32,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-# Create logs directory if it doesn't exist
-os.makedirs("logs", exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -115,10 +118,30 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+# Restrict browser access to configured frontend origins. CORS is not an
+# authentication mechanism; keep the API on a trusted network until auth exists.
+_raw_cors_origins = os.getenv(
+    "CORS_ORIGINS",
+    '["http://localhost:3000", "http://localhost:8000"]',
+)
+try:
+    _parsed_cors_origins = json.loads(_raw_cors_origins)
+    if not isinstance(_parsed_cors_origins, list):
+        raise ValueError("CORS_ORIGINS must be a JSON list or comma-separated origins")
+except json.JSONDecodeError:
+    _parsed_cors_origins = _raw_cors_origins.split(",")
+
+CORS_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in _parsed_cors_origins
+    if isinstance(origin, str) and origin.strip()
+]
+if not CORS_ORIGINS or "*" in CORS_ORIGINS:
+    raise ValueError("CORS_ORIGINS must contain explicit origins; wildcard origins are not supported")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -127,37 +150,36 @@ app.add_middleware(
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global exception handler caught: {exc}")
+    # Keep details in server logs, but do not return internal exception text to clients.
+    logger.exception("Unhandled request error")
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "message": str(exc)}
+        content={"detail": "Internal server error"}
     )
 
 # Include API routes
 app.include_router(router, prefix="/api/v1", tags=["AI Orchestrator"])
 
-# Serve static files from frontend directory
-try:
-    app.mount("/static", StaticFiles(directory="../frontend/static"), name="static")
-except:
-    # If frontend/static doesn't exist, create a simple fallback
-    pass
+# Resolve frontend assets relative to this file, not the current working directory.
+STATIC_DIR = Path(__file__).resolve().parent.parent / "frontend" / "static"
+INDEX_FILE = STATIC_DIR / "index.html"
 
-# Root endpoint - serve the main HTML file
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
 @app.get("/")
 async def root():
-    try:
-        return FileResponse("../frontend/static/index.html")
-    except:
-        # Fallback if frontend files don't exist
-        return {
-            "message": "AI Orchestrator API",
-            "version": "1.0.0",
-            "status": "running",
-            "docs": "/docs",
-            "redoc": "/redoc",
-            "note": "Frontend files not found. Please build the frontend first."
-        }
+    if INDEX_FILE.is_file():
+        return FileResponse(str(INDEX_FILE))
+    return {
+        "message": "AI Orchestrator API",
+        "version": "1.0.0",
+        "status": "running",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "note": "Frontend assets are not included in this deployment."
+    }
 
 # Health check endpoint
 @app.get("/health")
