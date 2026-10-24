@@ -15,6 +15,10 @@ from app.models import Task, User, Conversation, ConversationMessage, ServiceCon
 # Load environment variables
 load_dotenv()
 
+# Create the log directory before configuring FileHandler. Without this,
+# importing the application from a clean checkout can fail on startup.
+os.makedirs("logs", exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -26,9 +30,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-# Create logs directory if it doesn't exist
-os.makedirs("logs", exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
