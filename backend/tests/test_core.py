@@ -7,7 +7,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.command_parser import CommandParser, ParsedCommand
 from app.core.queue_manager import QueueManager
-from app.models import Base, Task
+from app.models import Base, Task, ServiceConfig
+from app.core.task_router import TaskRouter
 from app.models.task import TaskPriority, TaskStatus, TaskType
 from app.services.llm_service import LLMService
 
@@ -220,3 +221,54 @@ async def test_health_endpoint_works_without_external_services():
 
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
+
+
+@pytest.mark.asyncio
+async def test_task_router_normalizes_service_url_and_endpoint(monkeypatch, db_session):
+    requested = {}
+
+    class FakeResponse:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {"ok": True}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            requested["timeout"] = kwargs.get("timeout")
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def post(self, url, json, headers):
+            requested["url"] = url
+            requested["payload"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("app.core.task_router.httpx.AsyncClient", FakeClient)
+    db_session.add(
+        ServiceConfig(
+            service_name="browser_service",
+            service_type="browser",
+            base_url="http://browser.test/",
+            is_active=True,
+            endpoints={"execute": "/execute"},
+        )
+    )
+    task = make_task("browser task")
+    task.target_service = "browser_service"
+    task.service_endpoint = "/execute"
+    db_session.add(task)
+    db_session.commit()
+
+    result = await TaskRouter(db_session).route_task(task)
+
+    assert requested["url"] == "http://browser.test/execute"
+    assert requested["timeout"] == 30.0
+    assert requested["payload"]["task_id"] == task.id
+    assert result == {"ok": True}
+    assert task.status == TaskStatus.COMPLETED
