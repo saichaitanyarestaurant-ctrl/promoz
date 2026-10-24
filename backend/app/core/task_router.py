@@ -54,7 +54,7 @@ class TaskRouter:
             # Make request to service
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    f"{service_url}/{endpoint}",
+                    f"{service_url}{endpoint}",
                     json=payload,
                     headers={"Content-Type": "application/json"}
                 )
