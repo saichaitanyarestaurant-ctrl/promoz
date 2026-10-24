@@ -1,0 +1,36 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+.venv/
+venv/
+backend/venv/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local application data and logs
+*.db
+*.sqlite
+*.sqlite3
+backend/logs/
+backend/data/
+
+# Node.js / frontend build outputs
+node_modules/
+.next/
+out/
+dist/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
