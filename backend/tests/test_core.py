@@ -206,3 +206,17 @@ async def test_processing_marks_task_failed_when_service_errors(db_session):
     assert "service unavailable" in saved.error_message
     assert saved.completed_at is not None
     assert queue.active_tasks == 0
+
+
+
+@pytest.mark.asyncio
+async def test_health_endpoint_works_without_external_services():
+    from main import app
+    import httpx
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
