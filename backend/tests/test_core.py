@@ -157,3 +157,52 @@ async def test_llm_service_fails_clearly_without_an_api_key(monkeypatch):
         await service.chat_completion(
             messages=[{"role": "user", "content": "This test must not make a network call."}]
         )
+
+
+
+@pytest.mark.asyncio
+async def test_processing_executes_configured_service_and_saves_result(db_session):
+    queue = QueueManager(db_session)
+    task = make_task("route me")
+    db_session.add(task)
+    db_session.commit()
+    queue.active_tasks = 1
+
+    class RouterStub:
+        async def route_task(self, routed_task):
+            assert routed_task.id == task.id
+            routed_task.status = TaskStatus.COMPLETED
+            routed_task.result = {"ok": True, "output": "done"}
+            return routed_task.result
+
+    queue.task_router = RouterStub()
+    await queue._process_task(task)
+
+    saved = db_session.query(Task).filter(Task.id == task.id).one()
+    assert saved.status == TaskStatus.COMPLETED
+    assert saved.result == {"ok": True, "output": "done"}
+    assert saved.started_at is not None
+    assert saved.completed_at is not None
+    assert queue.active_tasks == 0
+
+
+@pytest.mark.asyncio
+async def test_processing_marks_task_failed_when_service_errors(db_session):
+    queue = QueueManager(db_session)
+    task = make_task("service unavailable")
+    db_session.add(task)
+    db_session.commit()
+    queue.active_tasks = 1
+
+    class RouterStub:
+        async def route_task(self, routed_task):
+            raise RuntimeError("service unavailable")
+
+    queue.task_router = RouterStub()
+    await queue._process_task(task)
+
+    saved = db_session.query(Task).filter(Task.id == task.id).one()
+    assert saved.status == TaskStatus.FAILED
+    assert "service unavailable" in saved.error_message
+    assert saved.completed_at is not None
+    assert queue.active_tasks == 0
